@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: ig-jira-copilot-test
+
+app:
+  jira:
+    base-url: http://localhost:9090
+    username: test-user
+    api-token: test-token
+    project-key: TEST
+    ai-exchange-tracking-field-id: customfield_10100
+    ai-agent-label: AI-Agent
+  copilot:
+    api-url: http://localhost:9091
+    api-key: test-key
+    model: gpt-4
+    max-tokens: 100
+    polling-interval-ms: 1000
+    max-polling-attempts: 3
+  routes:
+    refinement-schedule: 3600000
+    dev-plan-schedule: 3600000
+    dev-plan-review-schedule: 3600000
+    code-gen-schedule: 3600000
+
+camel:
+  springboot:
+    name: IgJiraCopilotTestCamelContext
+    main-run-controller: false
+  http:
+    jira-search-uri: http://localhost:9090/rest/api/3/search
+    jira-issue-uri: http://localhost:9090/rest/api/3/issue
+    jira-create-issue-uri: http://localhost:9090/rest/api/3/issue
+    copilot-completions-uri: http://localhost:9091/chat/completions
+
+logging:
+  level:
+    root: WARN
+    ca.eps_consulting: DEBUG
+    org.apache.camel: WARN
