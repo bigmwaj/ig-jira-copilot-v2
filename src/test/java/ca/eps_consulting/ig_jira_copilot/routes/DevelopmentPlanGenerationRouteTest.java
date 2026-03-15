@@ -1,6 +1,7 @@
 package ca.eps_consulting.ig_jira_copilot.routes;
 
 import ca.eps_consulting.ig_jira_copilot.config.AppConfig;
+import ca.eps_consulting.ig_jira_copilot.config.AppConstant;
 import ca.eps_consulting.ig_jira_copilot.dto.JiraTaskDto;
 import ca.eps_consulting.ig_jira_copilot.processor.CopilotProcessor;
 import ca.eps_consulting.ig_jira_copilot.processor.JiraProcessor;
@@ -69,9 +70,9 @@ class DevelopmentPlanGenerationRouteTest {
 
     @Test
     void testBuildJqlQueryForAI04() {
-        String jql = jiraProcessor.buildJqlQuery("AI04");
+        String jql = jiraProcessor.buildJqlQuery(AiState.AI04_WAITING_DEV_PLAN);
         assertNotNull(jql);
-        assertTrue(jql.contains("AI04"));
+        assertTrue(jql.contains("[AI04]"));
         assertTrue(jql.contains("AI-Agent"));
     }
 
@@ -110,7 +111,7 @@ class DevelopmentPlanGenerationRouteTest {
         assertTrue(payload.containsKey("fields"));
         Map<?, ?> fields = (Map<?, ?>) payload.get("fields");
         assertEquals("Development Plan: Payment Service", fields.get("summary"));
-        assertEquals("Task", ((Map<?, ?>) fields.get("issuetype")).get("name"));
+        assertEquals("SubTask", ((Map<?, ?>) fields.get("issueType")).get("name"));
 
         String json = objectMapper.writeValueAsString(payload);
         assertNotNull(json);

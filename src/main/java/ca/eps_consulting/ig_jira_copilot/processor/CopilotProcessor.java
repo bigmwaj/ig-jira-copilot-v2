@@ -8,7 +8,6 @@ import org.apache.camel.Exchange;
 import org.apache.camel.component.http.HttpMethods;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -22,13 +21,17 @@ public class CopilotProcessor {
     private static final Logger log = LoggerFactory.getLogger(CopilotProcessor.class);
 
     public static final String HEADER_COPILOT_PROMPT = "CopilotPrompt";
+
     public static final String HEADER_AI_RESPONSE = "AiResponse";
 
-    @Autowired
-    private AppConfig appConfig;
+    private final AppConfig appConfig;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper;
+
+    public CopilotProcessor(AppConfig appConfig, ObjectMapper objectMapper) {
+        this.appConfig = appConfig;
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * Prepares an exchange to call the Copilot chat completions API.
@@ -50,6 +53,10 @@ public class CopilotProcessor {
         );
 
         String requestBody = objectMapper.writeValueAsString(request);
+
+        var jiraIssueKey = exchange.getIn().getHeader("JiraIssueKey");
+        exchange.getIn().getHeaders().clear();
+        exchange.getIn().setHeader("JiraIssueKey", jiraIssueKey);
 
         exchange.getIn().setHeader(Exchange.HTTP_METHOD, HttpMethods.POST);
         exchange.getIn().setHeader("Authorization", "Bearer " + copilotConfig.getApiKey());
@@ -90,6 +97,7 @@ public class CopilotProcessor {
             %s
 
             Provide the refined user story with acceptance criteria in a structured format.
+            The response should be in Atlassian Document Format and should be translated into french.
             """,
             summary,
             description != null ? description : "(no description provided)"

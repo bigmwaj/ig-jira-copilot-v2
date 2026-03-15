@@ -1,5 +1,6 @@
 package ca.eps_consulting.ig_jira_copilot.routes;
 
+import ca.eps_consulting.ig_jira_copilot.config.AppConstant;
 import ca.eps_consulting.ig_jira_copilot.dto.JiraIssueDto;
 import ca.eps_consulting.ig_jira_copilot.dto.JiraTaskDto;
 import ca.eps_consulting.ig_jira_copilot.processor.CopilotProcessor;
@@ -8,26 +9,11 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.component.http.HttpMethods;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 
-/**
- * Route 2: Development Plan Generation
- *
- * <p>Polls Jira for issues with AI Exchange Tracking starting with "AI04" (Waiting for dev plan),
- * generates a development plan via Copilot, and creates a linked Jira Task with the plan.
- *
- * <p>Workflow:
- * <ol>
- *   <li>Timer triggers polling of Jira (AI04 → AI05)</li>
- *   <li>Each issue is sent asynchronously to SEDA</li>
- *   <li>Copilot API generates a development plan</li>
- *   <li>Jira state set to AI06, a new Task is created and linked to the story</li>
- * </ol>
- */
-@Component
+//@Component
 public class DevelopmentPlanGenerationRoute extends BaseOrchestrationRoute {
 
     private static final Logger log = LoggerFactory.getLogger(DevelopmentPlanGenerationRoute.class);
@@ -43,13 +29,13 @@ public class DevelopmentPlanGenerationRoute extends BaseOrchestrationRoute {
             .logExhausted(true));
 
         // ----------------------------------------------------------------
-        // ROUTE 2a: Timer-triggered Jira polling for AI04 issues
+        // ROUTE 2a: Timer-triggered Jira polling for [AI04] issues
         // ----------------------------------------------------------------
         from("timer:devPlanPoller?period={{app.routes.dev-plan-schedule}}")
             .routeId("route-devplan-poll")
-            .log(LoggingLevel.INFO, log, "Route 2: Polling Jira for User Stories awaiting dev plan (AI04)")
+            .log(LoggingLevel.INFO, log, "Route 2: Polling Jira for User Stories awaiting dev plan ([AI04])")
             .process(exchange -> {
-                String jql = jiraProcessor.buildJqlQuery("AI04");
+                String jql = jiraProcessor.buildJqlQuery(AiState.AI04_WAITING_DEV_PLAN, AppConstant.JIRA_ISSUE_TYPE_STORY);
                 jiraProcessor.prepareJiraSearch(exchange, jql);
             })
             .toD("{{camel.http.jira-search-uri}}?throwExceptionOnFailure=true")
@@ -74,11 +60,11 @@ public class DevelopmentPlanGenerationRoute extends BaseOrchestrationRoute {
                 exchange.getIn().setHeader(JiraProcessor.HEADER_JIRA_ISSUE_KEY, issue.getKey());
                 exchange.getIn().setHeader(JiraProcessor.HEADER_JIRA_ISSUE, issue);
             })
-            // Step 1: Update Jira to AI05 (Dev plan generation in progress)
+            // Step 1: Update Jira to [AI05] (Dev plan generation in progress)
             .process(exchange -> {
                 String issueKey = exchange.getIn().getHeader(JiraProcessor.HEADER_JIRA_ISSUE_KEY, String.class);
-                Map<String, Object> payload = jiraProcessor.buildAiStateUpdatePayload("AI05 - Dev plan generation in progress");
-                jiraProcessor.setJiraWriteHeaders(exchange, issueKey, HttpMethods.PUT.name());
+                Map<String, Object> payload = jiraProcessor.buildAiStateUpdatePayload(AiState.AI05_DEV_PLAN_IN_PROGRESS);
+                jiraProcessor.setJiraHeaders(exchange, issueKey, HttpMethods.PUT.name());
                 exchange.getIn().setBody(objectMapper.writeValueAsString(payload));
             })
             .toD("{{camel.http.jira-issue-uri}}/${header.JiraIssueKey}?throwExceptionOnFailure=false")
@@ -88,7 +74,7 @@ public class DevelopmentPlanGenerationRoute extends BaseOrchestrationRoute {
                 JiraIssueDto issue = exchange.getIn().getHeader(JiraProcessor.HEADER_JIRA_ISSUE, JiraIssueDto.class);
                 String prompt = copilotProcessor.buildDevPlanPrompt(
                     issue.getFields().getSummary(),
-                    issue.getFields().getDescription()
+                    issue.getFields().getDescription().getContentString()
                 );
                 copilotProcessor.prepareCopilotRequest(exchange, prompt);
             })
@@ -104,8 +90,8 @@ public class DevelopmentPlanGenerationRoute extends BaseOrchestrationRoute {
                 String issueKey = exchange.getIn().getHeader(JiraProcessor.HEADER_JIRA_ISSUE_KEY, String.class);
 
                 // Update parent story to AI06
-                Map<String, Object> payload = jiraProcessor.buildAiStateUpdatePayload("AI06 - Dev plan generated");
-                jiraProcessor.setJiraWriteHeaders(exchange, issueKey, HttpMethods.PUT.name());
+                Map<String, Object> payload = jiraProcessor.buildAiStateUpdatePayload(AiState.AI06_DEV_PLAN_GENERATED);
+                jiraProcessor.setJiraHeaders(exchange, issueKey, HttpMethods.PUT.name());
                 exchange.getIn().setBody(objectMapper.writeValueAsString(payload));
             })
             .toD("{{camel.http.jira-issue-uri}}/${header.JiraIssueKey}?throwExceptionOnFailure=false")
@@ -126,10 +112,10 @@ public class DevelopmentPlanGenerationRoute extends BaseOrchestrationRoute {
                     issueKey,
                     projectKey
                 );
-                task.setAiExchangeTracking("AI07 - Waiting for dev plan review");
+                task.setAiExchangeTracking(AiState.AI07_WAITING_DEV_PLAN_REVIEW);
 
                 Map<String, Object> taskPayload = jiraProcessor.buildCreateTaskPayload(task);
-                jiraProcessor.setJiraWriteHeaders(exchange, issueKey, HttpMethods.POST.name());
+                jiraProcessor.setJiraHeaders(exchange, issueKey, HttpMethods.POST.name());
                 exchange.getIn().setBody(objectMapper.writeValueAsString(taskPayload));
             })
             .toD("{{camel.http.jira-create-issue-uri}}?throwExceptionOnFailure=false")

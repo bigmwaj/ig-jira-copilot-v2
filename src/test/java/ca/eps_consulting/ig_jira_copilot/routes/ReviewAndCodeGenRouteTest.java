@@ -59,14 +59,14 @@ class ReviewAndCodeGenRouteTest {
 
     @Test
     void testBuildJqlQueryForAI07() {
-        String jql = jiraProcessor.buildJqlQuery("AI07");
+        String jql = jiraProcessor.buildJqlQuery(AiState.AI07_WAITING_DEV_PLAN_REVIEW);
         assertTrue(jql.contains("AI07"));
         assertTrue(jql.contains("AI-Agent"));
     }
 
     @Test
     void testBuildJqlQueryForAI10() {
-        String jql = jiraProcessor.buildJqlQuery("AI10");
+        String jql = jiraProcessor.buildJqlQuery(AiState.AI10_WAITING_CODE_GEN);
         assertTrue(jql.contains("AI10"));
         assertTrue(jql.contains("AI-Agent"));
     }

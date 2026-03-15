@@ -29,20 +29,20 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @SpringBootTest
 @MockEndpoints("seda:*")
 @TestPropertySource(properties = {
-    "app.jira.base-url=http://localhost:9090",
-    "app.jira.username=test-user",
-    "app.jira.api-token=test-token",
-    "app.jira.project-key=TEST",
-    "app.copilot.api-url=http://localhost:9091",
-    "app.copilot.api-key=test-key",
-    "app.routes.refinement-schedule=3600000",
-    "app.routes.dev-plan-schedule=3600000",
-    "app.routes.dev-plan-review-schedule=3600000",
-    "app.routes.code-gen-schedule=3600000",
-    "camel.http.jira-search-uri=http://localhost:9090/rest/api/3/search",
-    "camel.http.jira-issue-uri=http://localhost:9090/rest/api/3/issue",
-    "camel.http.jira-create-issue-uri=http://localhost:9090/rest/api/3/issue",
-    "camel.http.copilot-completions-uri=http://localhost:9091/chat/completions"
+        "app.jira.base-url=http://localhost:9090",
+        "app.jira.username=test-user",
+        "app.jira.api-token=test-token",
+        "app.jira.project-key=TEST",
+        "app.copilot.api-url=http://localhost:9091",
+        "app.copilot.api-key=test-key",
+        "app.routes.refinement-schedule=3600000",
+        "app.routes.dev-plan-schedule=3600000",
+        "app.routes.dev-plan-review-schedule=3600000",
+        "app.routes.code-gen-schedule=3600000",
+        "camel.http.jira-search-uri=http://localhost:9090/rest/api/3/search",
+        "camel.http.jira-issue-uri=http://localhost:9090/rest/api/3/issue",
+        "camel.http.jira-create-issue-uri=http://localhost:9090/rest/api/3/issue",
+        "camel.http.copilot-completions-uri=http://localhost:9091/chat/completions"
 })
 class UserStoryRefinementRouteTest {
 
@@ -94,7 +94,7 @@ class UserStoryRefinementRouteTest {
 
     @Test
     void testBuildJqlQueryForAI01() {
-        String jql = jiraProcessor.buildJqlQuery("AI01");
+        String jql = jiraProcessor.buildJqlQuery(AiState.AI01_WAITING_REFINEMENT);
         assertNotNull(jql);
         assert jql.contains("AI01");
         assert jql.contains("AI-Agent");
@@ -103,8 +103,8 @@ class UserStoryRefinementRouteTest {
     @Test
     void testBuildRefinementPrompt() {
         String prompt = copilotProcessor.buildRefinementPrompt(
-            "As a user, I want to login",
-            "Implement OAuth2 login flow"
+                "As a user, I want to login",
+                "Implement OAuth2 login flow"
         );
         assertNotNull(prompt);
         assert prompt.contains("As a user, I want to login");
@@ -117,7 +117,7 @@ class UserStoryRefinementRouteTest {
         issue.setKey("TEST-123");
         JiraIssueDto.Fields fields = new JiraIssueDto.Fields();
         fields.setSummary("Test Summary");
-        fields.setDescription("Test Description");
+        // fields.setDescription("Test Description");
         fields.setLabels(List.of("AI-Agent"));
         fields.setAiExchangeTracking("AI01 - Waiting for refinement");
         issue.setFields(fields);
@@ -130,27 +130,36 @@ class UserStoryRefinementRouteTest {
     @Test
     void testJiraSearchResultDeserialization() throws Exception {
         String json = """
-            {
-              "total": 1,
-              "startAt": 0,
-              "maxResults": 50,
-              "issues": [
                 {
-                  "id": "10001",
-                  "key": "TEST-1",
-                  "fields": {
-                    "summary": "Test User Story",
-                    "description": "As a user...",
-                    "labels": ["AI-Agent"],
-                    "customfield_10100": "AI01 - Waiting for refinement"
-                  }
+                  "total": 1,
+                  "startAt": 0,
+                  "maxResults": 50,
+                  "issues": [
+                    {
+                      "id": "10001",
+                      "key": "TEST-1",
+                      "fields": {
+                        "summary": "Test User Story",
+                        "description": {
+                            "type":"doc",
+                            "version":1,
+                            "content":[{
+                                "type":"paragraph",
+                                "content":[{
+                                    "type":"text",
+                                    "text":"### Refgoals for developers."
+                                }]
+                            }]
+                           },
+                        "labels": ["AI-Agent"],
+                        "customfield_10100": "AI01 - Waiting for refinement"
+                      }
+                    }
+                  ]
                 }
-              ]
-            }
-            """;
+                """;
 
         JiraIssueDto.SearchResult result = objectMapper.readValue(json, JiraIssueDto.SearchResult.class);
-        assertEquals(1, result.getTotal());
         assertEquals(1, result.getIssues().size());
         assertEquals("TEST-1", result.getIssues().get(0).getKey());
     }
@@ -158,31 +167,31 @@ class UserStoryRefinementRouteTest {
     @Test
     void testCopilotResponseDeserialization() throws Exception {
         String json = """
-            {
-              "id": "chatcmpl-abc123",
-              "object": "chat.completion",
-              "created": 1677858242,
-              "model": "gpt-4",
-              "choices": [
                 {
-                  "index": 0,
-                  "message": {
-                    "role": "assistant",
-                    "content": "Refined user story: As a user, I want to securely login..."
-                  },
-                  "finish_reason": "stop"
+                  "id": "chatcmpl-abc123",
+                  "object": "chat.completion",
+                  "created": 1677858242,
+                  "model": "gpt-4",
+                  "choices": [
+                    {
+                      "index": 0,
+                      "message": {
+                        "role": "assistant",
+                        "content": "Refined user story: As a user, I want to securely login..."
+                      },
+                      "finish_reason": "stop"
+                    }
+                  ],
+                  "usage": {
+                    "prompt_tokens": 100,
+                    "completion_tokens": 200,
+                    "total_tokens": 300
+                  }
                 }
-              ],
-              "usage": {
-                "prompt_tokens": 100,
-                "completion_tokens": 200,
-                "total_tokens": 300
-              }
-            }
-            """;
+                """;
 
         ca.eps_consulting.ig_jira_copilot.dto.CopilotResponseDto response =
-            objectMapper.readValue(json, ca.eps_consulting.ig_jira_copilot.dto.CopilotResponseDto.class);
+                objectMapper.readValue(json, ca.eps_consulting.ig_jira_copilot.dto.CopilotResponseDto.class);
 
         assertEquals("chatcmpl-abc123", response.getId());
         assertEquals(1, response.getChoices().size());

@@ -10,14 +10,14 @@ app:
     base-url: ${JIRA_BASE_URL:https://your-jira-instance.atlassian.net}
     username: ${JIRA_USERNAME:your-jira-email@company.com}
     api-token: ${JIRA_API_TOKEN:your-jira-api-token}
-    project-key: ${JIRA_PROJECT_KEY:MYPROJECT}
+    project-key: ${JIRA_PROJECT_KEY:MY_PROJECT}
     ai-exchange-tracking-field-id: ${JIRA_AI_FIELD_ID:customfield_10100}
     ai-agent-label: ${JIRA_AI_LABEL:AI-Agent}
 
   copilot:
-    api-url: ${COPILOT_API_URL:https://api.githubcopilot.com}
+    api-url: ${COPILOT_API_URL:https://models.inference.ai.azure.com}
     api-key: ${COPILOT_API_KEY:your-github-copilot-api-key}
-    model: ${COPILOT_MODEL:gpt-4}
+    model: ${COPILOT_MODEL:gpt-4o}
     max-tokens: ${COPILOT_MAX_TOKENS:4096}
     polling-interval-ms: ${COPILOT_POLLING_INTERVAL_MS:5000}
     max-polling-attempts: ${COPILOT_MAX_POLLING_ATTEMPTS:60}
@@ -33,13 +33,14 @@ app:
 # -------------------------------------------------------
 camel:
   springboot:
-    name: IgJiraCopilotCamelContext
     main-run-controller: true
   http:
-    jira-search-uri: ${JIRA_BASE_URL:https://your-jira-instance.atlassian.net}/rest/api/3/search
+    jira-search-uri: ${JIRA_BASE_URL:https://your-jira-instance.atlassian.net}/rest/api/3/search/jql
     jira-issue-uri: ${JIRA_BASE_URL:https://your-jira-instance.atlassian.net}/rest/api/3/issue
     jira-create-issue-uri: ${JIRA_BASE_URL:https://your-jira-instance.atlassian.net}/rest/api/3/issue
-    copilot-completions-uri: ${COPILOT_API_URL:https://api.githubcopilot.com}/chat/completions
+    copilot-completions-uri: ${COPILOT_API_URL:https://models.inference.ai.azure.com}/chat/completions
+  main:
+    name: IgJiraCopilotCamelContext
 
 # -------------------------------------------------------
 # Logging

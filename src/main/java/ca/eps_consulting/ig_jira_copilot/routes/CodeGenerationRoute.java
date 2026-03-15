@@ -1,5 +1,6 @@
 package ca.eps_consulting.ig_jira_copilot.routes;
 
+import ca.eps_consulting.ig_jira_copilot.config.AppConstant;
 import ca.eps_consulting.ig_jira_copilot.dto.JiraIssueDto;
 import ca.eps_consulting.ig_jira_copilot.processor.CopilotProcessor;
 import ca.eps_consulting.ig_jira_copilot.processor.JiraProcessor;
@@ -7,26 +8,11 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.component.http.HttpMethods;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 
-/**
- * Route 4: Code Generation
- *
- * <p>Polls Jira for Tasks with AI Exchange Tracking starting with "AI10" (Waiting for code generation),
- * generates code from the development plan via Copilot, and updates the task.
- *
- * <p>Workflow:
- * <ol>
- *   <li>Timer triggers polling of Jira (AI10 → AI11)</li>
- *   <li>Each task is sent asynchronously to SEDA</li>
- *   <li>Copilot API generates code based on the development plan</li>
- *   <li>Task description updated with generated code and state set to AI12</li>
- * </ol>
- */
-@Component
+//@Component
 public class CodeGenerationRoute extends BaseOrchestrationRoute {
 
     private static final Logger log = LoggerFactory.getLogger(CodeGenerationRoute.class);
@@ -46,9 +32,9 @@ public class CodeGenerationRoute extends BaseOrchestrationRoute {
         // ----------------------------------------------------------------
         from("timer:codeGenPoller?period={{app.routes.code-gen-schedule}}")
             .routeId("route-codegen-poll")
-            .log(LoggingLevel.INFO, log, "Route 4: Polling Jira for Tasks awaiting code generation (AI10)")
+            .log(LoggingLevel.INFO, log, "Route 4: Polling Jira for Tasks awaiting code generation [AI10]")
             .process(exchange -> {
-                String jql = jiraProcessor.buildJqlQuery("AI10");
+                String jql = jiraProcessor.buildJqlQuery(AiState.AI10_WAITING_CODE_GEN, AppConstant.JIRA_ISSUE_TYPE_SUB_TASK);
                 jiraProcessor.prepareJiraSearch(exchange, jql);
             })
             .toD("{{camel.http.jira-search-uri}}?throwExceptionOnFailure=true")
@@ -76,8 +62,8 @@ public class CodeGenerationRoute extends BaseOrchestrationRoute {
             // Step 1: Update task to AI11 (Code generation in progress)
             .process(exchange -> {
                 String issueKey = exchange.getIn().getHeader(JiraProcessor.HEADER_JIRA_ISSUE_KEY, String.class);
-                Map<String, Object> payload = jiraProcessor.buildAiStateUpdatePayload("AI11 - Code generation in progress");
-                jiraProcessor.setJiraWriteHeaders(exchange, issueKey, HttpMethods.PUT.name());
+                Map<String, Object> payload = jiraProcessor.buildAiStateUpdatePayload(AiState.AI11_CODE_GEN_IN_PROGRESS);
+                jiraProcessor.setJiraHeaders(exchange, issueKey, HttpMethods.PUT.name());
                 exchange.getIn().setBody(objectMapper.writeValueAsString(payload));
             })
             .toD("{{camel.http.jira-issue-uri}}/${header.JiraIssueKey}?throwExceptionOnFailure=false")
@@ -87,7 +73,7 @@ public class CodeGenerationRoute extends BaseOrchestrationRoute {
                 JiraIssueDto issue = exchange.getIn().getHeader(JiraProcessor.HEADER_JIRA_ISSUE, JiraIssueDto.class);
                 String prompt = copilotProcessor.buildCodeGenPrompt(
                     issue.getFields().getSummary(),
-                    issue.getFields().getDescription()
+                    issue.getFields().getDescription().getContentString()
                 );
                 copilotProcessor.prepareCopilotRequest(exchange, prompt);
             })
@@ -101,9 +87,9 @@ public class CodeGenerationRoute extends BaseOrchestrationRoute {
 
                 String issueKey = exchange.getIn().getHeader(JiraProcessor.HEADER_JIRA_ISSUE_KEY, String.class);
                 Map<String, Object> payload = jiraProcessor.buildDescriptionAndStateUpdatePayload(
-                    aiContent, "AI12 - Code generation completed"
+                    aiContent,AiState.AI12_CODE_GEN_COMPLETED
                 );
-                jiraProcessor.setJiraWriteHeaders(exchange, issueKey, HttpMethods.PUT.name());
+                jiraProcessor.setJiraHeaders(exchange, issueKey, HttpMethods.PUT.name());
                 exchange.getIn().setBody(objectMapper.writeValueAsString(payload));
             })
             .toD("{{camel.http.jira-issue-uri}}/${header.JiraIssueKey}?throwExceptionOnFailure=false")
